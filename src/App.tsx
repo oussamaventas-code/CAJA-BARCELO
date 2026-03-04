@@ -13,6 +13,7 @@ interface Transaction {
   service: string;
   price: number;
   paymentMethod: string;
+  notes?: string;
   timestamp: Date;
 }
 
@@ -32,6 +33,7 @@ export default function App() {
   const [clientName, setClientName] = useState('');
   const [employeeName, setEmployeeName] = useState('Admin');
   const [service, setService] = useState(SERVICES[0].name);
+  const [notes, setNotes] = useState('');
   const [price, setPrice] = useState<string>(SERVICES[0].defaultPrice.toString());
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [transactionToPrint, setTransactionToPrint] = useState<Transaction | null>(null);
@@ -54,6 +56,7 @@ export default function App() {
       service,
       price: parseFloat(price),
       paymentMethod,
+      notes: notes || '',
       timestamp: new Date(),
     };
 
@@ -64,6 +67,7 @@ export default function App() {
     setService(SERVICES[0].name);
     setPrice(SERVICES[0].defaultPrice.toString());
     setPaymentMethod(PAYMENT_METHODS[0]);
+    setNotes('');
   };
 
   const handleServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -75,9 +79,36 @@ export default function App() {
     }
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (confirm('¿Estás seguro de que deseas cerrar la caja y limpiar todas las transacciones de hoy?')) {
-      setTransactions([]);
+      try {
+        const webhookUrl = 'https://n8n.srv1119749.hstgr.cloud/webhook/d199e15f-7850-45c2-89fd-4a8b69d8406a';
+        const payload = {
+          date: new Date().toISOString(),
+          total: totalToday,
+          count: salesCount,
+          transactions: transactions.map(t => ({
+            ...t,
+            timestamp: t.timestamp.toISOString()
+          }))
+        };
+
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        
+        setTransactions([]);
+        alert('Caja cerrada y datos enviados correctamente.');
+      } catch (error) {
+        console.error('Error sending webhook:', error);
+        if (confirm('Error al enviar los datos al servidor. ¿Deseas limpiar la caja de todos modos?')) {
+          setTransactions([]);
+        }
+      }
     }
   };
 
@@ -104,7 +135,7 @@ export default function App() {
         {lastPrintedTicket && (
           <div className="space-y-4">
             <div className="text-center space-y-1">
-              <p className="text-xl font-bold">✨ ESTÉTICA GLAMOUR ✨</p>
+              <p className="text-xl font-bold">✨ BARCELO BEAUTY CENTER ✨</p>
               <p>---------------------------------</p>
             </div>
             
@@ -124,8 +155,13 @@ export default function App() {
               <p>---------------------------------</p>
               <div className="flex justify-between">
                 <span>{lastPrintedTicket.service}</span>
-                <span>${lastPrintedTicket.price.toFixed(2)}</span>
+                <span>{lastPrintedTicket.price.toFixed(2)}€</span>
               </div>
+              {lastPrintedTicket.notes && (
+                <div className="mt-2 text-xs italic">
+                  <p>Notas: {lastPrintedTicket.notes}</p>
+                </div>
+              )}
             </div>
             
             <p>---------------------------------</p>
@@ -133,7 +169,7 @@ export default function App() {
             <div className="space-y-1">
               <div className="flex justify-between font-bold text-lg">
                 <span>TOTAL:</span>
-                <span>${lastPrintedTicket.price.toFixed(2)}</span>
+                <span>{lastPrintedTicket.price.toFixed(2)}€</span>
               </div>
               <p>Método de Pago: {lastPrintedTicket.paymentMethod}</p>
             </div>
@@ -156,7 +192,7 @@ export default function App() {
         <header className="text-center">
           <h1 className="text-3xl font-semibold text-slate-900 flex items-center justify-center gap-2">
             <Sparkles className="text-[#D14D72]" />
-            Caja Rápida Estética
+            BARCELO BEAUTY CENTER
           </h1>
         </header>
 
@@ -165,7 +201,7 @@ export default function App() {
           <div className="text-center md:border-r border-[#F2E5E5] space-y-2">
             <p className="text-slate-500 font-medium uppercase tracking-wider text-sm">Total de Hoy:</p>
             <p className="text-5xl font-bold text-[#D14D72] tracking-tight">
-              ${totalToday.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {totalToday.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
             </p>
           </div>
           <div className="text-center space-y-2">
@@ -229,7 +265,7 @@ export default function App() {
                   <Banknote size={16} /> Precio
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">€</span>
                   <input
                     type="number"
                     step="0.01"
@@ -254,6 +290,18 @@ export default function App() {
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-600 flex items-center gap-2">
+                  Notas del Servicio
+                </label>
+                <textarea
+                  placeholder="Notas adicionales..."
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#D14D72]/20 focus:border-[#D14D72] transition-all min-h-[80px]"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
               </div>
 
               <button
@@ -296,7 +344,7 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-4">
                           <p className="font-semibold text-[#D14D72]">
-                            ${t.price.toFixed(2)}
+                            {t.price.toFixed(2)}€
                           </p>
                           <button
                             onClick={() => handlePrint(t)}
@@ -373,10 +421,17 @@ export default function App() {
                   <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
                     <span className="text-slate-500 font-semibold">Total:</span>
                     <span className="text-xl font-bold text-[#D14D72]">
-                      ${transactionToPrint.price.toFixed(2)}
+                      {transactionToPrint.price.toFixed(2)}€
                     </span>
                   </div>
                 </div>
+                
+                {transactionToPrint.notes && (
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 italic">
+                    <p className="font-semibold not-italic mb-1">Notas:</p>
+                    {transactionToPrint.notes}
+                  </div>
+                )}
                 
                 <div className="flex gap-3">
                   <button
